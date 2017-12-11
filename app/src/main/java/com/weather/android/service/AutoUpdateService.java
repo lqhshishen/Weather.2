@@ -39,9 +39,7 @@ public class AutoUpdateService extends Service {
         long triggerAtTime = SystemClock.elapsedRealtime() + anHour;
         Intent i = new Intent(this,AutoUpdateService.class);
         PendingIntent pi = PendingIntent.getService(this,0,i,0);
-        if (manager != null) {
-            manager.cancel(pi);
-        }
+        manager.cancel(pi);
         manager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,triggerAtTime,pi);
         return super.onStartCommand(intent, flags, startId);
     }
@@ -52,7 +50,6 @@ public class AutoUpdateService extends Service {
         if (weatherString != null) {
             Weather weather = Utility.handleWeatherResponse(weatherString);
             String weatherId = weather.basic.weatherId;
-
             String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId +
                     "&key=f9782b4b66144066b58a28c2a00c4ca7";
             HttpUtil.sendOKHttpRequest(weatherUrl, new Callback() {

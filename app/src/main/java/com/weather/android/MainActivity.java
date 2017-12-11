@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
                 if (prefs.getString("weather", null) != null) {
                     Intent intent = new Intent(this, WeatherActivity.class);
                     startActivity(intent);
-                    finish();
+//                    finish();
             }else {
                     Intent intent = new Intent(this,ChooseArea.class);
                     startActivity(intent);

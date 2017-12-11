@@ -3,7 +3,11 @@ package com.weather.android;
 import android.app.Fragment;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,9 +22,11 @@ import com.weather.android.db.City;
 import com.weather.android.db.County;
 import com.weather.android.db.Province;
 import com.weather.android.gson.Weather;
+import com.weather.android.util.GetContext;
 import com.weather.android.util.HttpUtil;
 import com.weather.android.util.Utility;
 
+import org.greenrobot.eventbus.EventBus;
 import org.litepal.crud.DataSupport;
 import org.w3c.dom.Text;
 
@@ -83,8 +89,10 @@ public class ChooseAreaFragment extends Fragment {
         titleText = (TextView) view.findViewById(R.id.title_text);
         backButton = (Button) view.findViewById(R.id.back_button);
         listView = (ListView) view.findViewById(R.id.list_view);
-        adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1,
-                dataList);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1,
+                    dataList);
+        }
         listView.setAdapter(adapter);
         return view;
     }
@@ -103,16 +111,17 @@ public class ChooseAreaFragment extends Fragment {
                     queryCounties();
                 } else if (currentLevel == LEVEL_COUNTY) {
                     String weatherId = countyList.get(position).getWeatherId();
-                    if (getActivity() instanceof MainActivity) {
+                    if (getActivity() instanceof ChooseArea) {
                         Intent intent = new Intent(getActivity(), WeatherActivity.class);
                         intent.putExtra("weather_id", weatherId);
+                        SharedPreferences.Editor editor =
+                                PreferenceManager.getDefaultSharedPreferences(getActivity()).edit();
+                        editor.putString("weather",null);
+                        editor.apply();
+                        Log.e("dsadas",weatherId);
+                        EventBus.getDefault().post(weatherId);
                         startActivity(intent);
                         getActivity().finish();
-                    } else if (getActivity() instanceof WeatherActivity) {
-                        WeatherActivity activity = (WeatherActivity) getActivity();
-                        activity.drawerLayout.closeDrawers();
-                        activity.swipeRefresh.setRefreshing(true);
-                        activity.requestWeather(weatherId);
                     }
                 }
             }
@@ -237,7 +246,9 @@ public class ChooseAreaFragment extends Fragment {
                     @Override
                     public void run() {
                         closeProgressDialog();
-                        Toast.makeText(getContext(), "加载失败", Toast.LENGTH_SHORT).show();
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            Toast.makeText(getContext(), "加载失败", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 });
             }

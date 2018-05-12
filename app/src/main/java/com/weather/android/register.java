@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.EditText;
@@ -51,16 +52,15 @@ public class register extends AppCompatActivity {
     }
     @OnClick(R.id.register)
     public void onViewClicked() {
-        if(username.getText().toString() != null && password.getText().toString() != null){
+        if(!TextUtils.isEmpty(username.getText().toString()) && !TextUtils.isEmpty(password.getText().toString())){
             User user = new User();
             user.setUsername(username.getText().toString());
-            user.setPassword(username.getText().toString());
+            user.setPassword(password.getText().toString());
             user.save();
             Toast.makeText(this, "注册成功", Toast.LENGTH_SHORT).show();
             finish();
         }else {
             Toast.makeText(this, "密码账号格式错误", Toast.LENGTH_SHORT).show();
         }
-
     }
 }

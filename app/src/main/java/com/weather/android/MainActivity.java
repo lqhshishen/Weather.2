@@ -66,8 +66,9 @@ public class MainActivity extends AppCompatActivity {
     private void confirmLogin() {
         userList = DataSupport.findAll(User.class);
         boolean a = false;
+        Log.e("xx", String.valueOf(userList.size()));
         for(int i = 0; i < userList.size(); i++) {
-            Log.e("adadasdas",userList.get(i).getPassword() + userList.get(i).getUsername());
+            Log.e("user",userList.get(i).getPassword() + "++" + userList.get(i).getUsername());
             if(Objects.equals(userList.get(i).getPassword(), password.getText().toString())
                     && Objects.equals(userList.get(i).getUsername(), username.getText().toString())) {
                 SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);

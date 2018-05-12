@@ -1,12 +1,19 @@
 package com.weather.android;
 
+import android.Manifest;
 import android.app.Fragment;
 import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,6 +25,15 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.baidu.location.BDLocation;
+import com.baidu.location.BDLocationListener;
+import com.baidu.location.LocationClient;
+import com.baidu.location.LocationClientOption;
+import com.baidu.mapapi.map.BaiduMap;
+import com.baidu.mapapi.map.MapStatusUpdate;
+import com.baidu.mapapi.map.MapStatusUpdateFactory;
+import com.baidu.mapapi.map.MyLocationData;
+import com.baidu.mapapi.model.LatLng;
 import com.weather.android.db.City;
 import com.weather.android.db.County;
 import com.weather.android.db.Province;
@@ -81,6 +97,10 @@ public class ChooseAreaFragment extends Fragment {
      */
     private int currentLevel;
 
+    private boolean isPermissionOk = true;
+
+//    private BaiduMap baiduMap;
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -89,12 +109,71 @@ public class ChooseAreaFragment extends Fragment {
         titleText = (TextView) view.findViewById(R.id.title_text);
         backButton = (Button) view.findViewById(R.id.back_button);
         listView = (ListView) view.findViewById(R.id.list_view);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1,
-                    dataList);
-        }
+        mLocationClient = new LocationClient(getActivity());
+        mLocationClient.registerLocationListener(new MyLocationListener());
+        adapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_list_item_1,
+                dataList);
+        List<String> permissionList = new ArrayList<>();
         listView.setAdapter(adapter);
+        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionList.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        if (ContextCompat.checkSelfPermission(getActivity(),Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionList.add(Manifest.permission.READ_PHONE_STATE);
+        }
+        if (ContextCompat.checkSelfPermission(getActivity(),Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
+        if (!permissionList.isEmpty()) {
+            String [] permissions = permissionList.toArray(new String[permissionList.size()]);
+            ActivityCompat.requestPermissions(getActivity(),permissions,1);
+        } else {
+            AlertDialog dialog = new AlertDialog.Builder(getActivity())
+                    .setTitle("提示")
+                    .setMessage("是否自动定位")
+                    .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            requestLocation();
+                            isAuto = true;
+                        }
+                    })
+                    .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+
+                        }
+                    }).create();
+            dialog.show();
+
+        }
+
+//        baiduMap.setMyLocationEnabled(true);
         return view;
+
+
+    }
+
+    void requestLocation() {
+        initLocation();
+        mLocationClient.start();
+    }
+
+    void onSelectCounty(String weatherId) {
+        if (getActivity() instanceof ChooseArea) {
+            Intent intent = new Intent(getActivity(), WeatherActivity.class);
+            intent.putExtra("weather_id", weatherId);
+            SharedPreferences.Editor editor =
+                    PreferenceManager.getDefaultSharedPreferences(getActivity()).edit();
+            editor.putString("weather",null);
+            editor.apply();
+            EventBus.getDefault().post(weatherId);
+            startActivity(intent);
+            getActivity().finish();
+        }
     }
 
     @Override
@@ -110,19 +189,7 @@ public class ChooseAreaFragment extends Fragment {
                     selectedCity = cityList.get(position);
                     queryCounties();
                 } else if (currentLevel == LEVEL_COUNTY) {
-                    String weatherId = countyList.get(position).getWeatherId();
-                    if (getActivity() instanceof ChooseArea) {
-                        Intent intent = new Intent(getActivity(), WeatherActivity.class);
-                        intent.putExtra("weather_id", weatherId);
-                        SharedPreferences.Editor editor =
-                                PreferenceManager.getDefaultSharedPreferences(getActivity()).edit();
-                        editor.putString("weather",null);
-                        editor.apply();
-                        Log.e("dsadas",weatherId);
-                        EventBus.getDefault().post(weatherId);
-                        startActivity(intent);
-                        getActivity().finish();
-                    }
+                    onSelectCounty(countyList.get(position).getWeatherId());
                 }
             }
         });
@@ -154,6 +221,8 @@ public class ChooseAreaFragment extends Fragment {
             adapter.notifyDataSetChanged();
             listView.setSelection(0);
             currentLevel = LEVEL_PROVINCE;
+            //判断权限是否通过，通过之后寻找与地址名称相同的省份并查询城市
+
         } else {
             String address = "http://guolin.tech/api/china";
             queryFromServer(address, "province");
@@ -272,5 +341,101 @@ public class ChooseAreaFragment extends Fragment {
         if(progressDialog != null){
             progressDialog.dismiss();
         }
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case 1:
+                if (grantResults.length>0) {
+                    for (int result:grantResults) {
+                        if (result != PackageManager.PERMISSION_GRANTED) {
+                            Toast.makeText(getActivity(), "必须同意所有权限才能自动定位", Toast.LENGTH_SHORT).show();
+                            isPermissionOk = false;
+                            return;
+                        }
+                        requestLocation();
+                        isPermissionOk = true;
+                    }
+                } else {
+                    Toast.makeText(getActivity(), "发生未知错误", Toast.LENGTH_SHORT).show();
+                }
+                break;
+        }
+    }
+
+    private void navigateTo(BDLocation location) {
+        LatLng ll = new LatLng(location.getLatitude(),location.getLongitude());
+        MapStatusUpdate update = MapStatusUpdateFactory.newLatLng(ll);
+//        baiduMap.animateMapStatus(update);
+        update = MapStatusUpdateFactory.zoomTo(16f);
+        MyLocationData.Builder locationBuilder = new MyLocationData.Builder();
+        locationBuilder.latitude(location.getLatitude());
+        locationBuilder.longitude(location.getLongitude());
+        MyLocationData locationData = locationBuilder.build();
+//        baiduMap.setMyLocationData(locationData);
+    }
+
+    String province;
+    String city;
+    String district;
+    public LocationClient mLocationClient;
+    boolean isAuto = false;
+    boolean oneTime = true;
+
+    public void getAdd() {
+        if (currentLevel == LEVEL_PROVINCE) {
+            for (int i = 0;i< provinceList.size();i++) {
+                if (province.equals(provinceList.get(i).getProvinceName())) {
+                    selectedProvince = provinceList.get(i);
+                    queryCities();
+                }
+            }
+        } else if (currentLevel == LEVEL_CITY) {
+            for (int i = 0;i < cityList.size();i++) {
+                if (city.equals(cityList.get(i).getCityName())) {
+                    selectedCity = cityList.get(i);
+                    queryCounties();
+                }
+            }
+        } else if (currentLevel == LEVEL_COUNTY) {
+            for (int i = 0;i < countyList.size();i++) {
+                if (district.equals(countyList.get(i).getCountyName())) {
+                    onSelectCounty(countyList.get(i).getWeatherId());
+                }
+            }
+        }
+    }
+
+    int count = 0;
+    public class MyLocationListener implements BDLocationListener {
+
+        @Override
+        public void onReceiveLocation(BDLocation bdLocation) {
+            if (bdLocation.getLocType() == BDLocation.TypeGpsLocation || bdLocation.getLocType()
+                    == BDLocation.TypeNetWorkLocation) {
+                navigateTo(bdLocation);
+                province = bdLocation.getProvince().replace("省","");
+                city = bdLocation.getCity().replace("市","");
+                 district = bdLocation.getDistrict().replace("区","");
+                if (count < 3) {
+                    count++;
+                    getAdd();
+                }
+                Log.e("xcom",province+city+district);
+            }
+        }
+    }
+    private void initLocation() {
+        LocationClientOption option = new LocationClientOption();
+        option.setScanSpan(5000);
+        option.setIsNeedAddress(true);
+        mLocationClient.setLocOption(option);
+    }
+    protected void onDestory() {
+        super.onDestroy();
+        mLocationClient.stop();
+//        baiduMap.setMyLocationEnabled(false);
     }
 }

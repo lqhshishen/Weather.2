@@ -97,7 +97,6 @@ public class ChooseAreaFragment extends Fragment {
      */
     private int currentLevel;
 
-    private boolean isPermissionOk = true;
 
 //    private BaiduMap baiduMap;
 
@@ -352,11 +351,11 @@ public class ChooseAreaFragment extends Fragment {
                     for (int result:grantResults) {
                         if (result != PackageManager.PERMISSION_GRANTED) {
                             Toast.makeText(getActivity(), "必须同意所有权限才能自动定位", Toast.LENGTH_SHORT).show();
-                            isPermissionOk = false;
+
                             return;
                         }
                         requestLocation();
-                        isPermissionOk = true;
+
                     }
                 } else {
                     Toast.makeText(getActivity(), "发生未知错误", Toast.LENGTH_SHORT).show();
